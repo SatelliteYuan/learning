@@ -48,13 +48,15 @@ def whetherShield(referenceObject, cropped, thresh):
         return (False, None)
     diff = cv2.absdiff(binary, referenceObject)
 
+    # cv2.imshow("frame", referenceObject)
+    # cv2.imshow("crop", cropped)
+    # cv2.imshow("binary", binary)
+    # cv2.imshow("diff", diff)
+    # cv2.waitKey()
+    # cv2.destroyAllWindows()
+
     noneZero = cv2.countNonZero(diff)
     if noneZero < thresh:
-        # cv2.imshow("frame", referenceObject)
-        # cv2.imshow("crop", cropped)
-        # cv2.imshow("binary", binary)
-        # cv2.imshow("diff", diff)
-        # cv2.waitKey()
         return (False, binary)
 
 
@@ -72,6 +74,7 @@ def getTimeString():
 def checkVehicleExist(inputPath):
     if inputPath is None:
         video = cv2.VideoCapture(0)
+        video.set(cv2.CAP_PROP_AUTO_EXPOSURE, 3)    #设置成自动曝光
     else:
         video = cv2.VideoCapture(inputPath)
     frameIndex = 0
@@ -88,10 +91,6 @@ def checkVehicleExist(inputPath):
         if ret is False:
             break
         frame = np.rot90(frame, 3)
-        cv2.imwrite("src1.tif", frame)
-
-        # cv2.imshow("frame", frame)
-        # cv2.waitKey()
 
         #检测前参照物遮挡状态
         frameIndex += 1
@@ -118,8 +117,8 @@ def checkVehicleExist(inputPath):
                 cv2.imwrite(os.path.join(distractionDir, curTime + "_" + str(frameIndex) + "_distractionFrame.jpg"), frame)
                 distractionFlag = True
                 continue
-            elif reviewFlag is False and distractionFlag is True:
-                distractionFlag = False
+            
+            distractionFlag = False
             vehicleExist = False
             leaveFrameIndex = frameIndex
             cv2.imwrite(os.path.join(enterAndLeaveDir, curTime + "_" + str(frameIndex) + "_leaveFrame.jpg"), frame)
@@ -236,7 +235,8 @@ def main():
         log.logger.error("load marker mask fail!")
         exit()
 
-    inputDir = None
+    # inputDir = None
+    inputDir = './inputVideos/1110.avi'
     checkVehicleExist(inputDir)
 
     # testImages()
@@ -245,10 +245,11 @@ def main():
 log = Logger('all.log',level='debug')
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
-        log.logger.error('except', e)
-    finally:
-        log.logger.error('try final')
+    main()
+    # try:
+    #     main()
+    # except Exception as e:
+    #     log.logger.error('except', e)
+    # finally:
+    #     log.logger.debug('conclude')
 

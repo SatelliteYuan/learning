@@ -1,0 +1,18 @@
+2021-11-09 17:05:25,495 - e:\Learning\vehicleDetection.py[line:180] - DEBUG: marker1未被遮挡！
+2021-11-09 17:05:30,787 - e:\Learning\vehicleDetection.py[line:188] - DEBUG: marker2被遮挡，检测道拖车中间部分
+2021-11-09 17:05:59,139 - e:\Learning\vehicleDetection.py[line:180] - DEBUG: marker1未被遮挡！
+2021-11-09 17:06:00,187 - e:\Learning\vehicleDetection.py[line:188] - DEBUG: marker2被遮挡，检测道拖车中间部分
+2021-11-09 17:06:01,308 - e:\Learning\vehicleDetection.py[line:254] - ERROR: try final
+2021-11-09 17:07:03,491 - e:\Learning\vehicleDetection.py[line:181] - DEBUG: marker1未被遮挡！
+2021-11-09 17:07:03,989 - e:\Learning\vehicleDetection.py[line:189] - DEBUG: marker2被遮挡，检测道拖车中间部分
+2021-11-09 17:07:10,291 - e:\Learning\vehicleDetection.py[line:181] - DEBUG: marker1未被遮挡！
+2021-11-09 17:07:11,542 - e:\Learning\vehicleDetection.py[line:189] - DEBUG: marker2被遮挡，检测道拖车中间部分
+2021-11-09 17:07:14,260 - e:\Learning\vehicleDetection.py[line:255] - ERROR: try final
+2021-11-09 17:18:11,106 - e:\Learning\vehicleDetection.py[line:181] - DEBUG: marker1未被遮挡！
+2021-11-09 17:23:03,546 - e:\Learning\vehicleDetection.py[line:189] - DEBUG: marker2被遮挡，检测道拖车中间部分
+2021-11-09 17:23:04,343 - e:\Learning\vehicleDetection.py[line:255] - ERROR: try final
+2021-11-10 11:15:09,126 - e:\Learning\vehicleDetection.py[line:116] - DEBUG: 检测到拖车中间部分！
+2021-11-10 11:15:09,720 - e:\Learning\vehicleDetection.py[line:116] - DEBUG: 检测到拖车中间部分！
+2021-11-10 11:15:10,573 - e:\Learning\vehicleDetection.py[line:253] - ERROR: try final
+2021-11-10 11:15:33,988 - e:\Learning\vehicleDetection.py[line:116] - DEBUG: 检测到拖车中间部分！
+2021-11-10 11:15:34,424 - e:\Learning\vehicleDetection.py[line:116] - DEBUG: 检测到拖车中间部分！

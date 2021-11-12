@@ -1,5 +1,6 @@
 import cv2
 import sys
+import numpy as np
 import logging
 from logging import handlers
 
@@ -41,6 +42,7 @@ def saveVideo(outputName, frameTotal):
         ret, frame = cap.read()
         if ret is False:
             break
+        frame = np.rot90(frame, 3)
         videoWriter.write(frame)
         if frameId > int(frameTotal):
             break

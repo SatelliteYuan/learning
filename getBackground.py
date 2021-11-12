@@ -2,6 +2,7 @@ from os import curdir
 import cv2
 import time
 import copy
+import numpy as np
 
 """
 OpenCV提供了一个称为BackgroundSubtractor的类，在分割前景和背景时很方便。
@@ -23,13 +24,14 @@ def getBackgroundWithMOG2(videoDir):
         ret, frame = cap.read()
         if ret is False:
             break
+        frame = np.rot90(frame, 3)
         foregroundMask = mog.apply(frame)
         background = mog.getBackgroundImage()
         foregroundMask = cv2.morphologyEx(foregroundMask, cv2.MORPH_OPEN, kernel)
         cv2.imshow('frame', frame)
         cv2.imshow('foreground', foregroundMask)
         cv2.imshow('background', background)
-        k = cv2.waitKey(1)
+        k = cv2.waitKey(0)
         if k == 27:
             cap.release()
             cv2.destroyAllWindows()
@@ -100,7 +102,7 @@ def frameDiff(videoDir):
 
 
 if __name__ == "__main__":
-    videoDir = './test_video_dir/camera2_avi/20210508163423.avi'
-    # getBackgroundWithMOG2(videoDir)
+    videoDir = './inputVideos/1110.avi'
+    getBackgroundWithMOG2(videoDir)
     # getBackgroundWittKNN(videoDir)
-    frameDiff(videoDir)
+    # frameDiff(videoDir)
