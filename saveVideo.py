@@ -2,6 +2,7 @@ import cv2
 import sys
 import numpy as np
 import logging
+import os
 from logging import handlers
 
 class Logger(object):
@@ -51,7 +52,31 @@ def saveVideo(outputName, frameTotal):
     cap.release()
     log.logger.debug("视频已保存完!")
 
+
+def saveFrames(outputDir, frameTotal):
+    cap = cv2.VideoCapture(0)
+    ret = cap.isOpened()
+    if ret is False:
+        log.logger.error("open camera fail!")
+        exit()
     
+    if not os.path.isdir(outputDir):
+        os.mkdir(outputDir)
+
+    frameId = 0
+    while True:
+        ret, frame = cap.read()
+        if ret is False:
+            break
+        frame = np.rot90(frame, 3)
+        cv2.imwrite(outputDir + str(frameId) + ".tif", frame)
+        if frameId > int(frameTotal):
+            break
+        frameId += 1
+
+    cap.release()
+    log.logger.debug("图片已保存完!")
+
 
 log = Logger('saveVideo.log',level='debug')
 
@@ -65,5 +90,11 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         log.logger.error("请输入参数！ videoName, frameTotal")
         exit()
-    saveVideo(sys.argv[1], sys.argv[2])
+
+    _,surfix = os.path.splitext(sys.argv[1])
+    if surfix == ".avi":
+        saveVideo(sys.argv[1], sys.argv[2])
+    else:
+        saveFrames(sys.argv[1], sys.argv[2])    
+
     exit()

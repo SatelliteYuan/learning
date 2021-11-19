@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import glob
+import time
 import matplotlib.pyplot as plt
 import copy
 
@@ -140,44 +141,77 @@ def splice():
     cv2.waitKey()
 
 
+def showDebugImage(images):
+    imageTotal = len(images)
+    for i in range(imageTotal):
+        plt.subplot(1, imageTotal, i + 1)
+        plt.title(images[i]["name"])
+        plt.imshow(images[i]["img"], cmap="gray")
+    plt.show()
+
+
+markerRoi = (199, 398, 63, 22)              #(x, y, w, h)
+marker2Roi = (147, 377, 38, 38)
+
 def getGradient():
-    inputDir = './vehicleHeadImages'
+    (x, y, w, h) = markerRoi
+    lowThresh = 50
+    highThresh = 100
+    markerMask = cv2.imread("./inputImgs/BK.tif", cv2.IMREAD_GRAYSCALE)
+    markerMask = markerMask[int(y) : int(y) + int(h), int(x) : int(x) + int(w)]
+    marker_canny = cv2.Canny(markerMask, lowThresh, highThresh)
+    inputDir = './inputImgs/jpg'
     for imgPath in glob.glob('{}/*.jpg'.format(inputDir)):
+        print(imgPath)
         img = cv2.imread(imgPath)
-        grayImg = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        cropping = img[int(y) : int(y) + int(h), int(x) : int(x) + int(w)]
+        grayImg = cv2.cvtColor(cropping, cv2.COLOR_BGR2GRAY)
         standartImg = grayImg / 255
         gradX = cv2.Sobel(standartImg, -1, 1, 0)
         gradY = cv2.Sobel(standartImg, -1, 0, 1)
         gradXY = cv2.addWeighted(gradX, 0.5, gradY, 0.5, 0)
-        gradXY = cv2.convertScaleAbs(gradXY * 255)  
+        gradXY = cv2.convertScaleAbs(gradXY * 255)
+        _, bin = cv2.threshold(grayImg, 0, 255, cv2.THRESH_OTSU)
+        cannyImg = cv2.Canny(grayImg, lowThresh, highThresh)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        cannyImg = cv2.dilate(cannyImg, kernel)
+        diff = marker_canny & ~cannyImg
 
-def writeVideo():
-    cap = cv2.VideoCapture("./test_video_dir/1/0.avi")
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    videoWriter = cv2.VideoWriter("./test_video_dir/wholeVideo.avi", cv2.VideoWriter_fourcc('I', '4', '2', '0'), fps, size)
-    inputDir = "./test_video_dir/1"
-    for dir in glob.glob("{}/*.avi".format(inputDir)):
-        print(dir)
-        cap = cv2.VideoCapture(dir)
-        while True:
-            ret, frame = cap.read()
-            if ret is False:
-                break
-            videoWriter.write(frame)
+        images = []
+        singleImg = {"name": "cropColor", "img": cropping}
+        images.append(singleImg)
+        singleImg = {"name": "maker", "img": marker_canny}
+        images.append(singleImg)
+        singleImg = {"name": "bin", "img": bin}
+        images.append(singleImg)
+        singleImg = {"name": "diff", "img": diff}
+        images.append(singleImg)
+        singleImg = {"name": "cannyImg", "img": cannyImg}
+        images.append(singleImg)
+        showDebugImage(images)
+
+        # plt.subplot(1, 5, 1)
+        # plt.title("cropColor")
+        # plt.imshow(cropping)
+        # plt.subplot(1, 5, 2)
+        # plt.title("maker")
+        # plt.imshow(marker_canny, cmap='gray')
+        # plt.subplot(1, 5, 3)
+        # plt.title("bin")
+        # plt.imshow(bin, cmap='gray')
+        # plt.subplot(1, 5, 4)
+        # plt.title("diff")
+        # plt.imshow(diff, cmap='gray')
+        # plt.subplot(1, 5, 5)
+        # plt.title("cannyImg")
+        # plt.imshow(cannyImg, cmap='gray')
+        # plt.show()   
+        # time.sleep(0.1) 
+
+
 
 if __name__ == "__main__":
-    cap = cv2.VideoCapture("./test_video_dir/1/91.avi")
-    index = 0
-    while True:
-        ret, frame = cap.read()
-        if ret is False:
-            break
-        cv2.imwrite("./test_video_dir/1/imgs/" + str(index) + ".tif", frame)
-        index += 1
-        
-
-
+    getGradient()
 
     # inputDir = 'imagesplicer_debug/20210508163835/result'
     # for dir in glob.glob("{}/*.jpg".format(inputDir)):  

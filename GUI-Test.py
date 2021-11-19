@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from tkinter import *
+```````````````````````````from tkinter import *```````````````````````````
 import hashlib
 import time
 
@@ -88,3 +88,4 @@ def gui_start():
 
 
 gui_start()
+

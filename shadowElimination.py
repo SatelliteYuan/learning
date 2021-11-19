@@ -23,6 +23,7 @@ def eliminate_shadow(img_bk, img_cur):
     cv2.imshow("v", v)
     cv2.waitKey(0)
     # obj = control_bar_hsv.ControlBarHSV(img_diff_hsv)
+    
     # obj.run()
 
 
