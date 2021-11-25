@@ -1,6 +1,7 @@
 import cv2
 import sys
 import numpy as np
+import glob
 import logging
 import os
 from logging import handlers
@@ -69,7 +70,7 @@ def saveFrames(outputDir, frameTotal):
         if ret is False:
             break
         frame = np.rot90(frame, 3)
-        cv2.imwrite(outputDir + str(frameId) + ".tif", frame)
+        cv2.imwrite(outputDir + str(frameId) + ".jpg", frame)
         if frameId > int(frameTotal):
             break
         frameId += 1
@@ -78,23 +79,39 @@ def saveFrames(outputDir, frameTotal):
     log.logger.debug("图片已保存完!")
 
 
+    
+   
+
 log = Logger('saveVideo.log',level='debug')
+
+
+
+videoWriter = cv2.VideoWriter("./inputImgs/jpg/11.avi", 
+                                cv2.VideoWriter_fourcc(*'XVID'), 
+                                60, 
+                                (640, 480))
+
+for dir in glob.glob("{}/*.tif".format('./inputImgs/frames')):
+    frame = cv2.imread(dir, cv2.IMREAD_COLOR)
+    videoWriter.write(frame)
+log.logger.debug("视频已保存完!")
+
 
 
 """
 param1:  保存的视频名
 param2:  收集视频的帧数
 """
-if __name__ == "__main__":
-    log.logger.debug(len(sys.argv))
-    if len(sys.argv) < 3:
-        log.logger.error("请输入参数！ videoName, frameTotal")
-        exit()
+# if __name__ == "__main__":
+#     log.logger.debug(len(sys.argv))
+#     if len(sys.argv) < 3:
+#         log.logger.error("请输入参数！ videoName, frameTotal")
+#         exit()
 
-    _,surfix = os.path.splitext(sys.argv[1])
-    if surfix == ".avi":
-        saveVideo(sys.argv[1], sys.argv[2])
-    else:
-        saveFrames(sys.argv[1], sys.argv[2])    
+#     _,surfix = os.path.splitext(sys.argv[1])
+#     if surfix == ".avi":
+#         saveVideo(sys.argv[1], sys.argv[2])
+#     else:
+#         saveFrames(sys.argv[1], sys.argv[2])    
 
-    exit()
+#     exit()
