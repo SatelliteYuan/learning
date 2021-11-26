@@ -4,6 +4,7 @@ import os
 import glob
 import time
 import logging
+import queue
 
 
 #显示中间过程图
@@ -67,12 +68,16 @@ class Marker(object):
 class VehicleDetection(object):
     def __init__(self):
         #marker模板
-        self.frontMarkerRoi = (264, 418, 48, 22)                 #(x, y, w, h)
+        #XiLong1
+        self.frontMarkerRoi = (264, 418, 48, 22)               
+        self.rearMarkerRoi = (344, 400, 53, 23)                
+        #XiLong2
+        # self.frontMarkerRoi = (199, 398, 63, 22)                
+        # self.rearMarkerRoi = (147, 377, 38, 38)                 
         self.frontMarkerMaskPath = './frontMarkerMask.tif'
         self.frontMarkerEdgePath = './frontMarkerEdge.tif'
         self.rearMarkerMaskPath = './rearMarkerMask.tif'
         self.rearMarkerEdgePath = './rearMarkerEdge.tif'
-        self.rearMarkerRoi = (344, 400, 53, 23)                  #用于复判车辆是否真实离开
         self.frontMarker = Marker(self.frontMarkerMaskPath, self.frontMarkerEdgePath, self.frontMarkerRoi)
         self.rearMarker = Marker(self.rearMarkerMaskPath, self.rearMarkerEdgePath, self.rearMarkerRoi)
 
@@ -92,10 +97,13 @@ class VehicleDetection(object):
         self.curTime = getTimeString()
 
         #用于更新背景
+        self.updateTemplateEnable = False
+        self.updateTemplateInterval = 30 * 60 * 30      #更新一次模板间隔的帧数
+        self.frameCount = 0                             #间隔计数
         self.saveDistraction = False
         self.collectMarkers = False
-        self.frontMarkers = []                                   
-        self.rearMarkers = []                                    
+        self.frontMarkerQueue = queue.Queue(maxsize = 5)
+        self.rearMarkerQueue = queue.Queue(maxsize = 5)
 
     
     #基于marker的梯度信息来判断marker是否被遮挡
@@ -160,39 +168,46 @@ class VehicleDetection(object):
 
     #更新marker模板
     def updateMarkerTemplate(self):
-        if len(self.frontMarkers) < 5 or len(self.rearMarkers) < 5:
-            logging.error("更新marker背景失败！")
+        if not self.frontMarkerQueue.full() or not self.rearMarkerQueue.full():
+            logging.error("未能收集足够的marker背景，更新背景失败！")
             return False
         
-        frontMarker = 0.2 * self.frontMarkers[0] + 0.2 * self.frontMarkers[1] + 0.2 * self.frontMarkers[2] \
-            + 0.2 * self.frontMarkers[3] + 0.2 * self.frontMarkers[4]
-        rearMarker = 0.2 * self.rearMarkers[0] + 0.2 * self.rearMarkers[1] + 0.2 * self.rearMarkers[2] \
-            + 0.2 * self.rearMarkers[3] + 0.2 * self.rearMarkers[4]
+        scale = 1 / self.frontMarkerQueue.qsize() 
+        frontMarker = None
+        while not self.frontMarkerQueue.empty():
+            if frontMarker is None:
+                frontMarker = self.frontMarkerQueue.get() * scale
+            else:
+                frontMarker += self.frontMarkerQueue.get() * scale
+        binaryThresh = int(255 * scale * 2) + 1    #背景图组中同一位置出现两次以上边缘点则标记入背景 
+        _, self.frontMarker.templateEdge = cv2.threshold(frontMarker, binaryThresh, 255, cv2.THRESH_BINARY)
 
-        _, self.frontMarker.templateEdge = cv2.threshold(frontMarker, 120, 255, cv2.THRESH_BINARY)
-        _, self.rearMarker.templateEdge = cv2.threshold(rearMarker, 120, 255, cv2.THRESH_BINARY)
-        logging.debug("更新marker背景！")
-
-        self.frontMarkers.clear()
-        self.rearMarkers.clear()
+        scale = 1 / self.rearMarkerQueue.qsize() 
+        rearMarker = None
+        while not self.rearMarkerQueue.empty():
+            if rearMarker is None:
+                rearMarker = self.rearMarkerQueue.get() * scale
+            else:
+                rearMarker += self.rearMarkerQueue.get() * scale
+        binaryThresh = int(255 * scale * 2) + 1
+        _, self.rearMarker.templateEdge = cv2.threshold(rearMarker, binaryThresh, 255, cv2.THRESH_BINARY)
+        logging.debug("成功更新marker背景！")
 
         return True
 
 
     #收集用于叠加生成背景的marker图
     def collectMarkerBackground(self, imgSrc, markerPosition):
-        if len(self.frontMarkers) >= 5 or len(self.rearMarkers) >= 5:
-            log.logger.debug("markers已收集满！")
-            return False
-
         if markerPosition == 'front':
             markerEdge = self.getMarkerEdge(imgSrc, self.frontMarkerRoi)
-            self.frontMarkers.append(markerEdge)        
+            if self.frontMarkerQueue.full():
+                self.frontMarkerQueue.get()
+            self.frontMarkerQueue.put(markerEdge)        
         elif markerPosition == 'rear':
             markerEdge = self.getMarkerEdge(imgSrc, self.rearMarkerRoi)
-            self.rearMarkers.append(markerEdge)        
-
-        return True
+            if self.rearMarkerQueue.full():
+                self.rearMarkerQueue.get()
+            self.rearMarkerQueue.put(markerEdge)        
 
 
     #检测车辆是否位于检测区域内
@@ -202,13 +217,13 @@ class VehicleDetection(object):
 
         #检测前参照物遮挡状态
         self.frameIndex += 1
+        self.frameCount += 1
         (x, y, w, h) = self.frontMarkerRoi
         frontCrop = frame[int(y) : int(y) + int(h), int(x) : int(x) + int(w)]
         if self.withGradient is True:
             whetherShieldFlag = self.whetherShieldWithGradient(self.frontMarker, frontCrop)
         else:
             whetherShieldFlag = self.whetherShieldWithThresh(self.frontMarker, frontCrop)
-
 
         #车辆进入检测区域
         if whetherShieldFlag is True and self.vehicleExist is False:       
@@ -225,17 +240,16 @@ class VehicleDetection(object):
                 self.enterFrameIndex = self.frameIndex
                 cv2.imwrite(os.path.join(self.enterAndLeaveSavePath, self.curTime + "_" + str(self.frameIndex) + "_enterFrame.jpg"), frame)
                 self.saveDistraction = True
+                self.collectMarkers = True
         elif whetherShieldFlag is False and self.vehicleExist is True:
             if abs(self.frameIndex - self.enterFrameIndex) < 5:    #离开帧和进入帧相邻则认为是错误匹配
                 return self.vehicleExist
-            
             (x, y, w, h) = self.rearMarkerRoi
             rearCrop = frame[int(y) : int(y) + int(h), int(x) : int(x) + int(w)]
             if self.withGradient is True:
                 reviewFlag = self.whetherShieldWithGradient(self.rearMarker, rearCrop)  
             else:
                 reviewFlag = self.whetherShieldWithThresh(self.rearMarker, rearCrop)   #判断后marker是否被遮挡，只有两个marker都能找到才确定车辆离开
-
             if reviewFlag is True:
                 if self.saveDistraction is True:         #同一辆车中间部分只保存一张图片
                     logging.debug("检测到拖车中间部分！")
@@ -252,13 +266,15 @@ class VehicleDetection(object):
                 self.curTime = getTimeString()
 
             #更新背景
-            if self.vehicleExist is False and abs(self.frameIndex - self.leaveFrameIndex) > 2 and self.collectMarkers is True:
-                self.collectMarkerBackground(frontCrop, "front")
-                self.collectMarkerBackground(rearCrop, "rear")
-                self.collectMarkers = False
+            if self.updateTemplateEnable is True:
+                if self.vehicleExist is False and abs(self.frameIndex - self.leaveFrameIndex) > 2 and self.collectMarkers is True:
+                    self.collectMarkerBackground(frontCrop, "front")
+                    self.collectMarkerBackground(rearCrop, "rear")
+                    self.collectMarkers = False
 
-            if len(self.frontMarkers) >= 5 and len(self.rearMarkers) >= 5:
-                self.updateMarkerTemplate()
+                if self.frameCount >= self.updateTemplateInterval:
+                    self.updateMarkerTemplate()
+                    self.frameCount = 0
 
         return self.vehicleExist
 
@@ -348,6 +364,7 @@ def testWithVideo():
 #运行摄像头测试
 def testWithCamera():
     detectObj = VehicleDetection()
+    detectObj.whetherRotate = True
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 3)    
     while True:
@@ -365,7 +382,7 @@ if __name__ == '__main__':
     th.setFormatter('%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s')
     logging.getLogger().addHandler(th)
     
-    testWithImages()
-    # testWithVideo()
+    # testWithImages()
+    testWithVideo()
     # testWithCamera()
     logging.debug('Test finish!')
