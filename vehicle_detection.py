@@ -7,22 +7,22 @@ import logging
 import queue
 
 
-#显示中间过程图
+# 显示中间过程图
 def showDebugImage(images):
-    import matplotlib.pyplot as plt
-    imageTotal = len(images)
-    for i in range(imageTotal):
-        plt.subplot(1, imageTotal, i + 1)
-        plt.title(images[i]["name"])
-        plt.imshow(images[i]["img"], cmap="gray")
-    plt.show()
-
+    pass
+    # import matplotlib.pyplot as plt
+    # imageTotal = len(images)
+    # for i in range(imageTotal):
+    #     plt.subplot(1, imageTotal, i + 1)
+    #     plt.title(images[i]["name"])
+    #     plt.imshow(images[i]["img"], cmap="gray")
+    # plt.show()
 
 #生成时间戳用作保存结果名
 def getTimeString():
     times = time.localtime()
-    timeStr = str(times.tm_year) + str(times.tm_mon).zfill(2) + str(times.tm_mday).zfill(2) + \
-        str(times.tm_hour).zfill(2) + str(times.tm_min).zfill(2)
+    timeStr = (str(times.tm_year) + str(times.tm_mon).zfill(2) + str(times.tm_mday).zfill(2) + 
+        str(times.tm_hour).zfill(2) + str(times.tm_min).zfill(2))
     return timeStr
 
 
@@ -38,11 +38,10 @@ class Marker(object):
         self.lowerThresh = 0
         self.upperThresh = 0
         self.binaryThresh = 0
-
         self.loadMarkerImage()
         self.updateMarkerThreshold()
 
-    #加载marker模板图
+    # 加载marker模板图
     def loadMarkerImage(self):
         if self.templateMaskPath is not None:
             self.templateMask = cv2.imread(self.templateMaskPath, cv2.IMREAD_GRAYSCALE)
@@ -50,7 +49,7 @@ class Marker(object):
         if self.templateEdgePath is not None:
             self.templateEdge = cv2.imread(self.templateEdgePath, cv2.IMREAD_GRAYSCALE)
 
-    #更新判断marker是否被遮挡相关的阈值
+    # 更新判断marker是否被遮挡相关的阈值
     def updateMarkerThreshold(self):
         if self.templateEdge is not None:
             kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
@@ -65,15 +64,12 @@ class Marker(object):
         if self.templateMask is not None:
             self.binaryThresh = int(int(self.markerRoi[2]) * int(self.markerRoi[3]) * 0.15)
 
+
 class VehicleDetection(object):
-    def __init__(self):
-        #marker模板
-        #XiLong1
-        self.frontMarkerRoi = (264, 418, 48, 22)               
-        self.rearMarkerRoi = (344, 400, 53, 23)                
-        #XiLong2
-        # self.frontMarkerRoi = (199, 398, 63, 22)                
-        # self.rearMarkerRoi = (147, 377, 38, 38)                 
+    def __init__(self, frontMarkerRoi, rearMarkerRoi):
+        # marker模板
+        self.frontMarkerRoi = frontMarkerRoi  # (x, y, w, h)
+        self.rearMarkerRoi = rearMarkerRoi
         self.frontMarkerMaskPath = './frontMarkerMask.tif'
         self.frontMarkerEdgePath = './frontMarkerEdge.tif'
         self.rearMarkerMaskPath = './rearMarkerMask.tif'
@@ -81,33 +77,41 @@ class VehicleDetection(object):
         self.frontMarker = Marker(self.frontMarkerMaskPath, self.frontMarkerEdgePath, self.frontMarkerRoi)
         self.rearMarker = Marker(self.rearMarkerMaskPath, self.rearMarkerEdgePath, self.rearMarkerRoi)
 
-        #状态记录
+        # 状态记录
         self.frameIndex = 0
         self.enterFrameIndex = 0
         self.leaveFrameIndex = 0
-        self.vehicleExist = False   
+        self.vehicleExist = False
 
-        #通用设置
-        self.frameInterval = 1                                   #处理帧间隔
+        # 通用设置
+        self.frameInterval = 1  # 处理帧间隔
         self.distractionSavePath = "./distraction"
         self.enterAndLeaveSavePath = "./result"
         self.withGradient = True
         self.showDebugImage = False
         self.whetherRotate = False
         self.curTime = getTimeString()
+        self.makeResultDir()
 
-        #用于更新背景
-        self.updateTemplateEnable = False
-        self.updateTemplateInterval = 30 * 60 * 30      #更新一次模板间隔的帧数
-        self.frameCount = 0                             #间隔计数
+        # 用于更新背景
+        self.updateTemplateEnable = True
+        self.updateTemplateInterval = 30 * 60 * 30  # 更新一次模板间隔的帧数
+        self.frameCount = 0  # 间隔计数
         self.saveDistraction = False
         self.collectMarkers = False
-        self.frontMarkerQueue = queue.Queue(maxsize = 5)
-        self.rearMarkerQueue = queue.Queue(maxsize = 5)
+        self.frontMarkerQueue = queue.Queue(maxsize=5)
+        self.rearMarkerQueue = queue.Queue(maxsize=5)
 
-    
-    #基于marker的梯度信息来判断marker是否被遮挡
-    def whetherShieldWithGradient(self, marker:Marker, cropped):
+    # 生成用于保存结果图的文件夹
+    def makeResultDir(self):
+        if os.path.isdir(self.enterAndLeaveSavePath) is False:
+            os.mkdir(self.enterAndLeaveSavePath)
+
+        if os.path.isdir(self.distractionSavePath) is False:
+            os.mkdir(self.distractionSavePath)
+
+    # 基于marker的梯度信息来判断marker是否被遮挡
+    def whetherShieldWithGradient(self, marker: Marker, cropped):
         if len(cropped.shape) == 3:
             cropped = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
 
@@ -135,16 +139,15 @@ class VehicleDetection(object):
         else:
             return True
 
-
-    #基于marker的二值化图来判断marker是否被遮挡
-    def whetherShieldWithThresh(self, marker:Marker, cropped):
+    # 基于marker的二值化图来判断marker是否被遮挡
+    def whetherShieldWithThresh(self, marker: Marker, cropped):
         if len(cropped.shape) == 3:
             cropped = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
 
         ret, binary = cv2.threshold(cropped, 0, 255, cv2.THRESH_OTSU)
         if ret is False:
             logging.error("threshold失败！")
-            return (False, None)
+            return False
         diff = cv2.absdiff(binary, marker.templateMask)
 
         if self.showDebugImage is True:
@@ -165,24 +168,23 @@ class VehicleDetection(object):
         else:
             return False
 
-
-    #更新marker模板
+    # 更新marker模板
     def updateMarkerTemplate(self):
         if not self.frontMarkerQueue.full() or not self.rearMarkerQueue.full():
             logging.error("未能收集足够的marker背景，更新背景失败！")
             return False
-        
-        scale = 1 / self.frontMarkerQueue.qsize() 
+
+        scale = 1 / self.frontMarkerQueue.qsize()
         frontMarker = None
         while not self.frontMarkerQueue.empty():
             if frontMarker is None:
                 frontMarker = self.frontMarkerQueue.get() * scale
             else:
                 frontMarker += self.frontMarkerQueue.get() * scale
-        binaryThresh = int(255 * scale * 2) + 1    #背景图组中同一位置出现两次以上边缘点则标记入背景 
+        binaryThresh = int(255 * scale * 2) + 1  # 背景图组中同一位置出现两次以上边缘点则标记入背景
         _, self.frontMarker.templateEdge = cv2.threshold(frontMarker, binaryThresh, 255, cv2.THRESH_BINARY)
 
-        scale = 1 / self.rearMarkerQueue.qsize() 
+        scale = 1 / self.rearMarkerQueue.qsize()
         rearMarker = None
         while not self.rearMarkerQueue.empty():
             if rearMarker is None:
@@ -191,83 +193,94 @@ class VehicleDetection(object):
                 rearMarker += self.rearMarkerQueue.get() * scale
         binaryThresh = int(255 * scale * 2) + 1
         _, self.rearMarker.templateEdge = cv2.threshold(rearMarker, binaryThresh, 255, cv2.THRESH_BINARY)
+
+        self.frontMarker.updateMarkerThreshold()
+        self.rearMarker.updateMarkerThreshold()
         logging.debug("成功更新marker背景！")
 
         return True
 
-
-    #收集用于叠加生成背景的marker图
+    # 收集用于叠加生成背景的marker图
     def collectMarkerBackground(self, imgSrc, markerPosition):
         if markerPosition == 'front':
             markerEdge = self.getMarkerEdge(imgSrc, self.frontMarkerRoi)
             if self.frontMarkerQueue.full():
                 self.frontMarkerQueue.get()
-            self.frontMarkerQueue.put(markerEdge)        
+            self.frontMarkerQueue.put(markerEdge)
         elif markerPosition == 'rear':
             markerEdge = self.getMarkerEdge(imgSrc, self.rearMarkerRoi)
             if self.rearMarkerQueue.full():
                 self.rearMarkerQueue.get()
-            self.rearMarkerQueue.put(markerEdge)        
+            self.rearMarkerQueue.put(markerEdge)
 
+            # 检测车辆是否位于检测区域内
 
-    #检测车辆是否位于检测区域内
     def checkVehicleExist(self, frame):
+        if self.frontMarker.templateEdge is None or self.frontMarker.templateMask is None \
+                or self.rearMarker.templateEdge is None or self.rearMarker.templateMask is None:
+            return False
+
         if self.whetherRotate is True:
             frame = np.rot90(frame, 3)
 
-        #检测前参照物遮挡状态
+        # 检测前参照物遮挡状态
         self.frameIndex += 1
         self.frameCount += 1
         (x, y, w, h) = self.frontMarkerRoi
-        frontCrop = frame[int(y) : int(y) + int(h), int(x) : int(x) + int(w)]
+        frontCrop = frame[int(y): int(y) + int(h), int(x): int(x) + int(w)]
         if self.withGradient is True:
             whetherShieldFlag = self.whetherShieldWithGradient(self.frontMarker, frontCrop)
         else:
             whetherShieldFlag = self.whetherShieldWithThresh(self.frontMarker, frontCrop)
 
-        #车辆进入检测区域
-        if whetherShieldFlag is True and self.vehicleExist is False:       
-            if abs(self.frameIndex - self.leaveFrameIndex) < 5:    
+        # 车辆进入检测区域
+        if whetherShieldFlag is True and self.vehicleExist is False:
+            if abs(self.frameIndex - self.leaveFrameIndex) < 5:
                 return self.vehicleExist
             (x, y, w, h) = self.rearMarkerRoi
-            rearCrop = frame[int(y) : int(y) + int(h), int(x) : int(x) + int(w)]
+            rearCrop = frame[int(y): int(y) + int(h), int(x): int(x) + int(w)]
             if self.withGradient is True:
-                reviewFlag = self.whetherShieldWithGradient(self.rearMarker, rearCrop)  
+                reviewFlag = self.whetherShieldWithGradient(self.rearMarker, rearCrop)
             else:
                 reviewFlag = self.whetherShieldWithThresh(self.rearMarker, rearCrop)
             if reviewFlag is True:
                 self.vehicleExist = True
-                self.enterFrameIndex = self.frameIndex
-                cv2.imwrite(os.path.join(self.enterAndLeaveSavePath, self.curTime + "_" + str(self.frameIndex) + "_enterFrame.jpg"), frame)
+                self.enterFrameIndex = self.frameIndex  
+                cv2.imwrite(os.path.join(self.enterAndLeaveSavePath, 
+                    '{}_{}_enterFrame.jpg'.format(self.curTime, str(self.frameIndex))), frame)
                 self.saveDistraction = True
                 self.collectMarkers = True
         elif whetherShieldFlag is False and self.vehicleExist is True:
-            if abs(self.frameIndex - self.enterFrameIndex) < 5:    #离开帧和进入帧相邻则认为是错误匹配
+            if abs(self.frameIndex - self.enterFrameIndex) < 5:  # 离开帧和进入帧相邻则认为是错误匹配
                 return self.vehicleExist
             (x, y, w, h) = self.rearMarkerRoi
-            rearCrop = frame[int(y) : int(y) + int(h), int(x) : int(x) + int(w)]
+            rearCrop = frame[int(y): int(y) + int(h), int(x): int(x) + int(w)]
             if self.withGradient is True:
-                reviewFlag = self.whetherShieldWithGradient(self.rearMarker, rearCrop)  
+                reviewFlag = self.whetherShieldWithGradient(self.rearMarker, rearCrop)
             else:
-                reviewFlag = self.whetherShieldWithThresh(self.rearMarker, rearCrop)   #判断后marker是否被遮挡，只有两个marker都能找到才确定车辆离开
+                reviewFlag = self.whetherShieldWithThresh(self.rearMarker,
+                                                          rearCrop)  # 判断后marker是否被遮挡，只有两个marker都能找到才确定车辆离开
             if reviewFlag is True:
-                if self.saveDistraction is True:         #同一辆车中间部分只保存一张图片
+                if self.saveDistraction is True:  # 同一辆车中间部分只保存一张图片
                     logging.debug("检测到拖车中间部分！")
-                    cv2.imwrite(os.path.join(self.distractionSavePath, self.curTime + "_" + str(self.frameIndex) + "_distractionFrame.jpg"), frame)
+                    cv2.imwrite(os.path.join(self.distractionSavePath, 
+                        '{}_{}_distractionFrame.jpg'.format(self.curTime, str(self.frameIndex))), frame)
                     self.saveDistraction = False
             else:
                 self.vehicleExist = False
                 self.leaveFrameIndex = self.frameIndex
-                cv2.imwrite(os.path.join(self.enterAndLeaveSavePath, self.curTime + "_" + str(self.frameIndex) + "_leaveFrame.jpg"), frame)
+                cv2.imwrite(os.path.join(self.enterAndLeaveSavePath, 
+                    '{}_{}_leaveFrame.jpg'.format(self.curTime, str(self.frameIndex))), frame)
             
             #更新图片保存序号
             if self.frameIndex > 5000:
                 self.frameIndex = 0
                 self.curTime = getTimeString()
 
-            #更新背景
+            # 更新背景
             if self.updateTemplateEnable is True:
-                if self.vehicleExist is False and abs(self.frameIndex - self.leaveFrameIndex) > 2 and self.collectMarkers is True:
+                if self.vehicleExist is False and abs(
+                        self.frameIndex - self.leaveFrameIndex) > 2 and self.collectMarkers is True:
                     self.collectMarkerBackground(frontCrop, "front")
                     self.collectMarkerBackground(rearCrop, "rear")
                     self.collectMarkers = False
@@ -278,36 +291,42 @@ class VehicleDetection(object):
 
         return self.vehicleExist
 
+    # 生成对应marker的模板图，首次使用时需要手动调用
+    def generateMarkerTemplate(self, background_img, force=False):
+        if force or self.frontMarker.templateEdge is None:
+            self.frontMarker.templateEdge = self.getMarkerEdge(background_img, self.frontMarkerRoi)
+            self.frontMarker.updateMarkerThreshold()
+            if self.frontMarker.templateEdge is not None:
+                cv2.imwrite(self.frontMarkerEdgePath, self.frontMarker.templateEdge)
+        if force or self.frontMarker.templateMask is None:
+            self.frontMarker.templateMask = self.getMarkerMask(background_img, self.frontMarkerRoi)
+            self.frontMarker.updateMarkerThreshold()
+            if self.frontMarker.templateMask is not None:
+                cv2.imwrite(self.frontMarkerMaskPath, self.frontMarker.templateMask)
 
-    #生成对应marker的模板图，首次使用时需要手动调用
-    def generateMarkerTemplate(self, src):
-        self.frontMarker.templateEdge = self.getMarkerEdge(src, self.frontMarkerRoi)
-        if self.frontMarker.templateEdge is not None:
-            cv2.imwrite(self.frontMarkerEdgePath, self.frontMarker.templateEdge)
-        self.frontMarker.templateMask = self.getMarkerMask(src, self.frontMarkerRoi)
-        if self.frontMarker.templateMask is not None:
-            cv2.imwrite(self.frontMarkerMaskPath, self.frontMarker.templateMask)
+        if force or self.rearMarker.templateEdge is None:
+            self.rearMarker.templateEdge = self.getMarkerEdge(background_img, self.rearMarkerRoi)
+            self.rearMarker.updateMarkerThreshold()
+            if self.rearMarker.templateEdge is not None:
+                cv2.imwrite(self.rearMarkerEdgePath, self.rearMarker.templateEdge)
 
-        self.rearMarker.templateEdge = self.getMarkerEdge(src, self.rearMarkerRoi)
-        if self.rearMarker.templateEdge is not None:
-            cv2.imwrite(self.rearMarkerEdgePath, self.rearMarker.templateEdge)
+        if force or self.rearMarker.templateMask is None:
+            self.rearMarker.templateMask = self.getMarkerMask(background_img, self.rearMarkerRoi)
+            self.rearMarker.updateMarkerThreshold()
+            if self.rearMarker.templateMask is not None:
+                cv2.imwrite(self.rearMarkerMaskPath, self.rearMarker.templateMask)
 
-        self.rearMarker.templateMask = self.getMarkerMask(src, self.rearMarkerRoi)
-        if self.rearMarker.templateMask is not None:
-            cv2.imwrite(self.rearMarkerMaskPath, self.rearMarker.templateMask)
-
-
-    #获取marker的二值化mask图
+    # 获取marker的二值化mask图
     def getMarkerMask(self, img, roi):
         if len(img.shape) > 2:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            cvt_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         (x, y, w, h) = roi
-        cropped = img[int(y) : int(y) + int(h), int(x) : int(x) + int(w)]
+        cropped = cvt_img[int(y): int(y) + int(h), int(x): int(x) + int(w)]
         _, mask = cv2.threshold(cropped, 0, 255, cv2.THRESH_OTSU)
 
         if self.showDebugImage is True:
             images = []
-            singleImg = {"name": "img", "img": img}
+            singleImg = {"name": "img", "img": cvt_img}
             images.append(singleImg)
             singleImg = {"name": "cropped", "img": cropped}
             images.append(singleImg)
@@ -317,18 +336,17 @@ class VehicleDetection(object):
 
         return mask
 
-
-    #获取marker的边缘图
+    # 获取marker的边缘图
     def getMarkerEdge(self, img, roi):
         if len(img.shape) > 2:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            cvt_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         (x, y, w, h) = roi
-        cropped = img[int(y) : int(y) + int(h), int(x) : int(x) + int(w)]
+        cropped = cvt_img[int(y): int(y) + int(h), int(x): int(x) + int(w)]
         edgeImg = cv2.Canny(cropped, 50, 100)
 
         if self.showDebugImage is True:
             images = []
-            singleImg = {"name": "img", "img": img}
+            singleImg = {"name": "img", "img": cvt_img}
             images.append(singleImg)
             singleImg = {"name": "cropped", "img": cropped}
             images.append(singleImg)
@@ -339,9 +357,9 @@ class VehicleDetection(object):
         return edgeImg
 
 
-#运行图片集测试
-def testWithImages():
-    detectObj = VehicleDetection()
+# 运行图片集测试
+def testWithImages(frontMarkerRoi, rearMarkerRoi):
+    detectObj = VehicleDetection(frontMarkerRoi, rearMarkerRoi)
     inputDir = "./inputImgs/jpg/300"
     for dir in glob.glob("{}/*.jpg".format(inputDir)):
         logging.debug(dir)
@@ -349,24 +367,33 @@ def testWithImages():
         detectObj.checkVehicleExist(frame)
 
 
-#运行本地视频测试
-def testWithVideo():
-    detectObj = VehicleDetection()
+# 运行本地视频测试
+def testWithVideo(frontMarkerRoi, rearMarkerRoi):
+    detectObj = VehicleDetection(frontMarkerRoi, rearMarkerRoi)
     inputDir = "./inputVideos/1110.avi"
     cap = cv2.VideoCapture(inputDir)
+
+    generated_marker_template = False
+
     while True:
         ret, frame = cap.read()
         if ret is False:
             break
-        detectObj.checkVehicleExist(frame)
+
+        if generated_marker_template is False:
+            detectObj.generateMarkerTemplate(frame, True)
+            generated_marker_template = True
+            continue
+
+        print(detectObj.checkVehicleExist(frame))
 
 
-#运行摄像头测试
-def testWithCamera():
-    detectObj = VehicleDetection()
+# 运行摄像头测试
+def testWithCamera(frontMarkerRoi, rearMarkerRoi):
+    detectObj = VehicleDetection(frontMarkerRoi, rearMarkerRoi)
     detectObj.whetherRotate = True
     cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 3)    
+    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 3)
     while True:
         ret, frame = cap.read()
         if ret is False:
@@ -375,14 +402,31 @@ def testWithCamera():
 
 
 if __name__ == '__main__':
-    #初始化logging
+    # 初始化logging
     from logging import handlers
+
     logging.basicConfig(level=logging.DEBUG)
-    th = handlers.TimedRotatingFileHandler(filename='all.log', when='D', backupCount=3, encoding='utf-8')
+    logSavePath = './log/'
+    if os.path.isdir(logSavePath) is False:
+        os.mkdir(logSavePath)
+
+    th = handlers.TimedRotatingFileHandler(filename=logSavePath + 'all.log', when='D', backupCount=3, encoding='utf-8')
     th.setFormatter('%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s')
     logging.getLogger().addHandler(th)
-    
-    # testWithImages()
-    testWithVideo()
-    # testWithCamera()
+
+    # XiLong1 resizeRatio = 1.0
+    # frontMarkerRoi = (264, 418, 48, 22)
+    # rearMarkerRoi = (344, 400, 53, 23)
+    # XiLong2 resizeRatio = 1.0
+    # frontMarkerRoi = (199, 398, 63, 22)
+    # rearMarkerRoi = (147, 377, 38, 38)
+
+    # XiLong2 resizeRatio = 0.5
+    frontMarkerRoi = (130, 383, 55, 18)
+    rearMarkerRoi = (217, 368, 39, 26)
+
+    # testWithImages(frontMarkerRoi, rearMarkerRoi)
+    testWithVideo(frontMarkerRoi, rearMarkerRoi)
+    # testWithCamera(frontMarkerRoi, rearMarkerRoi)
+
     logging.debug('Test finish!')
